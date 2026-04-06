@@ -32,4 +32,4 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
           TIMEZONE_LABEL: Asia/Kolkata
-        run: python website_health_agent.py
+        run: python agent.py
