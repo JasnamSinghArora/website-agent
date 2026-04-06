@@ -1,4 +1,4 @@
-name: Website Health Report
+name: Website Report
 
 on:
   schedule:
