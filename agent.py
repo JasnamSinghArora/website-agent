@@ -9,7 +9,9 @@ from datetime import datetime
 # =========================
 
 URLS_TO_CHECK = [
-    "https://thegcsgroup.in", # TO CHANGE
+    "https://www.bipspatiala.net", 
+    "https://www.spakora.in",
+    "https://www.bodyzonegym.in",
 ]
 
 PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
