@@ -2,11 +2,33 @@ name: Website Report
 
 on:
   schedule:
-    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *"
+    - cron: "10 2 * * *"
   workflow_dispatch:
 
 jobs:
   run-report:
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "scheduled run works"
+      - name: Checkout repository
+        uses: actions/checkout@v5
+    
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+    
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+    
+      - name: Run website health agent
+        run: python agent.py
+        env:
+          PAGESPEED_API_KEY: ${{ secrets.PAGESPEED_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
+          TIMEZONE_LABEL: Asia/Kolkata
