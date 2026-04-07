@@ -31,12 +31,11 @@ jobs:
           TIMEZONE_LABEL: Asia/Kolkata
         run: python agent.py
 
-      - name: Schedule next run (tomorrow 8 AM IST)
+      - name: Schedule next run for tomorrow 8:00 AM IST
         if: success()
         uses: austenstone/schedule@v1.3
         with:
           github-token: ${{ secrets.TOKEN }}
-          workflow: "website-report.yml"
-          date: "tomorrow 8:00 AM"
-          timezone: "Asia/Kolkata"
+          workflow: "Website Report"
+          date: "tomorrow 8:00 AM Asia/Kolkata"
           wait-ms: 45000
