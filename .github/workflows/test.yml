@@ -2,7 +2,8 @@ name: Website Report
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # 10:30 AM India time
+    - cron: "55 12 * * *"
+      timezone: "Asia/Kolkata"
   workflow_dispatch:
 
 jobs:
