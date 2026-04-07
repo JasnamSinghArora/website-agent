@@ -2,8 +2,7 @@ name: Website Report
 
 on:
   schedule:
-    - cron: "55 12 * * *"
-      timezone: "Asia/Kolkata"
+    - cron: "38 7 * * *"
   workflow_dispatch:
 
 jobs:
@@ -11,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v6
