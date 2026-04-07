@@ -6,7 +6,7 @@ from datetime import datetime
 
 # =========================
 # CONFIG
-# =========================
+# ========================= 
 
 URLS_TO_CHECK = [
     "https://www.bipspatiala.net", 
