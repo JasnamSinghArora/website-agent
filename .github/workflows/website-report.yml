@@ -30,3 +30,13 @@ jobs:
           REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
           TIMEZONE_LABEL: Asia/Kolkata
         run: python agent.py
+
+      - name: Schedule next run for tomorrow 8:00 AM IST
+        if: success()
+        uses: austenstone/schedule@v1.3
+        with:
+          github-token: ${{ secrets.TOKEN }}
+          workflow: "website-report.yml"
+          date: "tomorrow 8:00 AM"
+          timezone: "Asia/Kolkata"
+          wait-ms: 45000
