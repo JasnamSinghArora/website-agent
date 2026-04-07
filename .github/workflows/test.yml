@@ -3,6 +3,7 @@ name: Website Report
 on:
   schedule:
     - cron: "*/5 * * * *"   # 10:30 AM India time
+  workflow_dispatch:
 
 jobs:
   run-report:
