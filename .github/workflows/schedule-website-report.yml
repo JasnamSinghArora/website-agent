@@ -1,0 +1,35 @@
+name: Schedule Website Report
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # checks every 5 minutes
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "When to run the workflow"
+        required: true
+        type: string
+        default: "tomorrow 9:00 AM"
+      timezone:
+        description: "Timezone for the requested date"
+        required: true
+        type: string
+        default: "Asia/Kolkata"
+
+concurrency:
+  group: schedule-${{ github.event.inputs.date || 'poller' }}
+  cancel-in-progress: false
+
+jobs:
+  schedule:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Schedule Website Report
+        uses: austenstone/schedule@v1.3
+        with:
+          github-token: ${{ secrets.TOKEN }}
+          workflow: "website-report.yml"
+          date: ${{ github.event.inputs.date }}
+          timezone: ${{ github.event.inputs.timezone }}
+          wait-ms: 45000
