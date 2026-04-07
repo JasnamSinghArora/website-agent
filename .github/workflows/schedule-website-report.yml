@@ -2,14 +2,14 @@ name: Schedule Website Report
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # checks every 5 minutes
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       date:
         description: "When to run the workflow"
         required: true
         type: string
-        default: "tomorrow 9:00 AM"
+        default: "tomorrow 8:00 AM"
       timezone:
         description: "Timezone for the requested date"
         required: true
