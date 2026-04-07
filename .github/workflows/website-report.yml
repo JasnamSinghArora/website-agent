@@ -2,7 +2,7 @@ name: Website Report
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # 10:00 AM India time
+    - cron: "0 5 * * *"   # 10:30 AM India time
 
 jobs:
   run-report:
