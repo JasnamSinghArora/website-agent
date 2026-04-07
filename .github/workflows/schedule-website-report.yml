@@ -9,7 +9,7 @@ on:
         description: "When to run the workflow"
         required: true
         type: string
-        default: "tomorrow 8:00 AM"
+        default: "today 12:40 PM"
       timezone:
         description: "Timezone for the requested date"
         required: true
