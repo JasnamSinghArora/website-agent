@@ -2,7 +2,7 @@ name: Website Report
 
 on:
   schedule:
-    - cron: "23,28,33,38,43,48,53,58 * * * *"
+    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *"
   workflow_dispatch:
 
 jobs:
