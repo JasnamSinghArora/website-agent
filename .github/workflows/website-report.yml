@@ -1,7 +1,6 @@
 name: Website Report
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"   # 10:00 AM India time
 
