@@ -49,7 +49,7 @@ def get_pagespeed_data(url, api_key):
     ]
 
     try:
-        response = requests.get(PAGESPEED_ENDPOINT, params=params, timeout=30, headers=HEADERS)
+        response = requests.get(PAGESPEED_ENDPOINT, params=params, timeout=60, headers=HEADERS)
     except Exception as e:
         return None, f"Request failed: {str(e)}"
 
