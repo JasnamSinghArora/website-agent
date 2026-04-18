@@ -6,6 +6,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urldefrag
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # =========================
 # CONFIG
@@ -19,27 +20,36 @@ URLS_TO_CHECK = [
 
 PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
-MAX_PAGES_PER_SITE = 100
-REQUEST_TIMEOUT = 20
+MAX_PAGES_PER_SITE = 75
+REQUEST_TIMEOUT = (5, 10)   # connect timeout, read timeout
+MAX_WORKERS = 12
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; WebsiteHealthBot/1.0)"
 }
 
+SKIP_EXTENSIONS = (
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip",
+    ".mp4", ".mp3", ".avi", ".mov", ".css", ".js", ".xml"
+)
 
 # =========================
 # FETCH DATA FROM PAGESPEED
 # =========================
 
 def get_pagespeed_data(url, api_key):
-    params = {
-        "url": url,
-        "key": api_key,
-        "category": ["performance", "accessibility", "seo", "best-practices"]
-    }
+    params = [
+        ("url", url),
+        ("key", api_key),
+        ("category", "performance"),
+        ("category", "accessibility"),
+        ("category", "seo"),
+        ("category", "best-practices"),
+    ]
 
     try:
-        response = requests.get(PAGESPEED_ENDPOINT, params=params, timeout=60)
+        response = requests.get(PAGESPEED_ENDPOINT, params=params, timeout=30, headers=HEADERS)
     except Exception as e:
         return None, f"Request failed: {str(e)}"
 
@@ -47,16 +57,15 @@ def get_pagespeed_data(url, api_key):
         return None, f"API Error {response.status_code}: {response.text}"
 
     data = response.json()
-
     lighthouse = data.get("lighthouseResult", {})
     categories = lighthouse.get("categories", {})
+    audits = lighthouse.get("audits", {})
 
     scores = {}
     for key in ["performance", "accessibility", "seo", "best-practices"]:
-        if key in categories and categories[key].get("score") is not None:
-            scores[key] = int(categories[key]["score"] * 100)
-
-    audits = lighthouse.get("audits", {})
+        score = categories.get(key, {}).get("score")
+        if score is not None:
+            scores[key] = int(score * 100)
 
     suggestions = []
     for audit in audits.values():
@@ -70,45 +79,64 @@ def get_pagespeed_data(url, api_key):
         "suggestions": suggestions[:5]
     }, None
 
-
 # =========================
 # URL HELPERS
 # =========================
 
 def normalize_url(base_url, href):
     full_url = urljoin(base_url, href)
-    full_url, _ = urldefrag(full_url)  # remove #fragment
+    full_url, _ = urldefrag(full_url)
     return full_url.rstrip("/")
-
 
 def is_same_domain(url, root_netloc):
     return urlparse(url).netloc == root_netloc
-
 
 def is_http_url(url):
     parsed = urlparse(url)
     return parsed.scheme in ("http", "https")
 
+def should_skip_url(url):
+    lower = url.lower()
+    return lower.endswith(SKIP_EXTENSIONS)
 
 # =========================
-# CHECK SINGLE URL
+# LINK CHECKING
 # =========================
 
-def get_status_code(url):
+def check_url(session, source_page, url):
     try:
-        response = requests.head(url, allow_redirects=True, timeout=REQUEST_TIMEOUT, headers=HEADERS)
-        if response.status_code >= 400 or response.status_code == 405:
-            response = requests.get(url, allow_redirects=True, timeout=REQUEST_TIMEOUT, headers=HEADERS)
-        return response.status_code, None
-    except Exception as e:
-        return None, str(e)
+        response = session.get(
+            url,
+            allow_redirects=True,
+            timeout=REQUEST_TIMEOUT,
+            headers=HEADERS,
+            stream=True
+        )
+        status_code = response.status_code
+        response.close()
 
+        if status_code >= 400:
+            return {
+                "source_page": source_page,
+                "broken_url": url,
+                "status": status_code,
+                "error": None
+            }
+        return None
+
+    except Exception as e:
+        return {
+            "source_page": source_page,
+            "broken_url": url,
+            "status": "REQUEST_FAILED",
+            "error": str(e)
+        }
 
 # =========================
 # FULL WEBSITE CRAWLER
 # =========================
 
-def crawl_site_for_broken_links(start_url, max_pages=100):
+def crawl_site_for_broken_links(start_url, max_pages=25):
     parsed_start = urlparse(start_url)
     root_netloc = parsed_start.netloc
 
@@ -116,85 +144,84 @@ def crawl_site_for_broken_links(start_url, max_pages=100):
     visited_pages = set()
     checked_links = set()
     broken_links = []
+    tasks = []
     crawled_count = 0
 
     session = requests.Session()
     session.headers.update(HEADERS)
 
-    while queue and crawled_count < max_pages:
-        current_page = queue.popleft()
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        while queue and crawled_count < max_pages:
+            current_page = queue.popleft()
 
-        if current_page in visited_pages:
-            continue
-
-        visited_pages.add(current_page)
-        crawled_count += 1
-
-        try:
-            page_response = session.get(current_page, timeout=REQUEST_TIMEOUT)
-        except Exception as e:
-            broken_links.append({
-                "source_page": current_page,
-                "broken_url": current_page,
-                "status": "REQUEST_FAILED",
-                "error": str(e)
-            })
-            continue
-
-        if page_response.status_code >= 400:
-            broken_links.append({
-                "source_page": current_page,
-                "broken_url": current_page,
-                "status": page_response.status_code,
-                "error": None
-            })
-            continue
-
-        content_type = page_response.headers.get("Content-Type", "")
-        if "text/html" not in content_type:
-            continue
-
-        soup = BeautifulSoup(page_response.text, "html.parser")
-
-        for tag in soup.find_all("a", href=True):
-            href = tag["href"].strip()
-
-            if not href:
-                continue
-            if href.startswith("#"):
-                continue
-            if href.startswith("mailto:") or href.startswith("tel:") or href.startswith("javascript:"):
+            if current_page in visited_pages:
                 continue
 
-            full_url = normalize_url(current_page, href)
+            visited_pages.add(current_page)
+            crawled_count += 1
 
-            if not is_http_url(full_url):
+            try:
+                page_response = session.get(current_page, timeout=REQUEST_TIMEOUT)
+            except Exception as e:
+                broken_links.append({
+                    "source_page": current_page,
+                    "broken_url": current_page,
+                    "status": "REQUEST_FAILED",
+                    "error": str(e)
+                })
                 continue
 
-            if not is_same_domain(full_url, root_netloc):
+            if page_response.status_code >= 400:
+                broken_links.append({
+                    "source_page": current_page,
+                    "broken_url": current_page,
+                    "status": page_response.status_code,
+                    "error": None
+                })
                 continue
 
-            if full_url not in checked_links:
-                checked_links.add(full_url)
-                status_code, error = get_status_code(full_url)
+            content_type = page_response.headers.get("Content-Type", "")
+            if "text/html" not in content_type:
+                continue
 
-                if error or status_code is None or status_code >= 400:
-                    broken_links.append({
-                        "source_page": current_page,
-                        "broken_url": full_url,
-                        "status": status_code if status_code is not None else "REQUEST_FAILED",
-                        "error": error
-                    })
+            soup = BeautifulSoup(page_response.text, "html.parser")
 
-            if full_url not in visited_pages:
-                queue.append(full_url)
+            for tag in soup.find_all("a", href=True):
+                href = tag["href"].strip()
+
+                if not href:
+                    continue
+                if href.startswith("#"):
+                    continue
+                if href.startswith(("mailto:", "tel:", "javascript:")):
+                    continue
+
+                full_url = normalize_url(current_page, href)
+
+                if not is_http_url(full_url):
+                    continue
+                if not is_same_domain(full_url, root_netloc):
+                    continue
+                if should_skip_url(full_url):
+                    continue
+
+                if full_url not in checked_links:
+                    checked_links.add(full_url)
+                    tasks.append(executor.submit(check_url, session, current_page, full_url))
+
+                if full_url not in visited_pages:
+                    queue.append(full_url)
+
+        for future in as_completed(tasks):
+            result = future.result()
+            if result:
+                broken_links.append(result)
 
     return {
         "broken_links": broken_links,
         "pages_crawled": crawled_count,
         "unique_links_checked": len(checked_links)
     }
-
 
 # =========================
 # GENERATE REPORT
@@ -203,8 +230,7 @@ def crawl_site_for_broken_links(start_url, max_pages=100):
 def generate_report(results, timezone_label):
     timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    report = f"""
-Website Health Report
+    report = f"""Website Health Report
 Generated: {timestamp}
 Timezone: {timezone_label}
 
@@ -249,7 +275,6 @@ Timezone: {timezone_label}
 
     return report
 
-
 # =========================
 # SEND EMAIL
 # =========================
@@ -270,14 +295,10 @@ def send_email(subject, body):
     msg["From"] = mail_from
     msg["To"] = recipients
 
-    try:
-        with smtplib.SMTP(smtp_host, int(smtp_port)) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(mail_from, [r.strip() for r in recipients.split(",")], msg.as_string())
-    except Exception as e:
-        raise Exception(f"SMTP Error: {str(e)}")
-
+    with smtplib.SMTP(smtp_host, int(smtp_port), timeout=20) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(mail_from, [r.strip() for r in recipients.split(",")], msg.as_string())
 
 # =========================
 # MAIN EXECUTION
@@ -310,14 +331,8 @@ def main():
             results[url] = data
 
     report = generate_report(results, timezone_label)
-
-    send_email(
-        subject="Website Health Report",
-        body=report
-    )
-
+    send_email("Website Health Report", report)
     print("Report sent successfully.")
-
 
 if __name__ == "__main__":
     main()
