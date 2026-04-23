@@ -16,11 +16,13 @@ URLS_TO_CHECK = [
     "https://www.bipspatiala.net",
     "https://www.spakora.in",
     "https://www.bodyzonegym.in",
+    "https://www.abcmontessori.co.in/",
+    "https://www.thegcsgroup.in/",
 ]
 
 PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
-MAX_PAGES_PER_SITE = 75
+MAX_PAGES_PER_SITE = 100
 REQUEST_TIMEOUT = (5, 10)   # connect timeout, read timeout
 MAX_WORKERS = 12
 
