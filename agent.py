@@ -22,7 +22,7 @@ URLS_TO_CHECK = [
 
 PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
-MAX_PAGES_PER_SITE = 100
+MAX_PAGES_PER_SITE = 1000
 REQUEST_TIMEOUT = (15, 30)   # connect timeout, read timeout
 MAX_WORKERS = 8
 
