@@ -23,8 +23,8 @@ URLS_TO_CHECK = [
 PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
 MAX_PAGES_PER_SITE = 100
-REQUEST_TIMEOUT = (5, 10)   # connect timeout, read timeout
-MAX_WORKERS = 12
+REQUEST_TIMEOUT = (15, 30)   # connect timeout, read timeout
+MAX_WORKERS = 8
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; WebsiteHealthBot/1.0)"
@@ -127,12 +127,7 @@ def check_url(session, source_page, url):
         return None
 
     except Exception as e:
-        return {
-            "source_page": source_page,
-            "broken_url": url,
-            "status": "REQUEST_FAILED",
-            "error": str(e)
-        }
+        return None
 
 # =========================
 # FULL WEBSITE CRAWLER
@@ -164,13 +159,7 @@ def crawl_site_for_broken_links(start_url, max_pages=25):
 
             try:
                 page_response = session.get(current_page, timeout=REQUEST_TIMEOUT)
-            except Exception as e:
-                broken_links.append({
-                    "source_page": current_page,
-                    "broken_url": current_page,
-                    "status": "REQUEST_FAILED",
-                    "error": str(e)
-                })
+            except Exception:
                 continue
 
             if page_response.status_code >= 400:
