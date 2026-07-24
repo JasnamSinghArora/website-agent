@@ -276,20 +276,37 @@ def send_email(subject, body):
     smtp_user = os.environ.get("SMTP_USER")
     smtp_password = os.environ.get("SMTP_PASSWORD")
     mail_from = os.environ.get("MAIL_FROM")
-    recipients = os.environ.get("REPORT_RECIPIENTS")
+    recipients_env = os.environ.get("REPORT_RECIPIENTS")
 
-    if not all([smtp_host, smtp_port, smtp_user, smtp_password, mail_from, recipients]):
+    if not all([
+        smtp_host,
+        smtp_port,
+        smtp_user,
+        smtp_password,
+        mail_from,
+        recipients_env,
+    ]):
         raise Exception("Missing one or more SMTP environment variables")
+
+    # Parses: "email1@example.com, email2@example.com"
+    recipients = [
+        email.strip()
+        for email in recipients_env.split(",")
+        if email.strip()
+    ]
+
+    if not recipients:
+        raise Exception("REPORT_RECIPIENTS does not contain any valid email addresses")
 
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = mail_from
-    msg["To"] = recipients
+    msg["To"] = ", ".join(recipients)
 
     with smtplib.SMTP(smtp_host, int(smtp_port), timeout=20) as server:
         server.starttls()
         server.login(smtp_user, smtp_password)
-        server.sendmail(mail_from, [r.strip() for r in recipients.split(",")], msg.as_string())
+        server.sendmail(mail_from, recipients, msg.as_string())
 
 # =========================
 # MAIN EXECUTION
